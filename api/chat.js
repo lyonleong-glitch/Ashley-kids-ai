@@ -59,10 +59,12 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Gemini request failed:", response.status, JSON.stringify(data.error));;
-      return res.status(502).json({
-        error: "Ashley couldn't answer just now. Please try again."
-      });
+  return res.status(502).json({
+    error: "Gemini error details",
+    status: response.status,
+    details: data.error || data
+  });
+};
     }
 
     const reply = data.candidates?.[0]?.content?.parts
