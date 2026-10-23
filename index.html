@@ -27,7 +27,23 @@
 </section>
 <section class="card" aria-label="Chat with Ashley"><div class="row" style="justify-content:space-between"><strong>💬 Chat with Ashley</strong><span class="pill" id="mode-label">Play Mode</span></div>
 <div class="chat" id="chat" aria-live="polite" style="margin-top:12px"><div class="bubble ashley">Hello, friend! 🌟 Pick a mode and let's learn together. What shall we explore?</div></div>
-<form class="chatform" id="chat-form"><input id="message" maxlength="500" autocomplete="off" placeholder="Type a message to Ashley…" aria-label="Your message"><button class="btn" type="submit">Send</button></form>
+<form class="chatform" id="chat-form">
+  <input id="message" maxlength="500"
+    autocomplete="off"
+    placeholder="Type or speak to Ashley…"
+    aria-label="Your message">
+
+  <button class="btn secondary" type="button"
+    id="mic-button" aria-label="Speak to Ashley">
+    🎤
+  </button>
+
+  <button class="btn" type="submit">Send</button>
+</form>
+
+<p id="voice-status" class="notice" aria-live="polite">
+  Tap 🎤 to speak, or type your message.
+</p>
 <p class="notice">This starter version uses built-in activities—AI chat isn't connected yet. An adult should help younger children use the app.</p>
 </section><footer class="footer">Made with care for curious little minds 💛<br>Starter demo · No account or personal information needed</footer>
 </main>
