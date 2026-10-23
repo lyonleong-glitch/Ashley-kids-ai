@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+ export default async function handler(req, res) {
   // Only allow POST requests
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -43,7 +43,71 @@ export default async function handler(req, res) {
     "Bahasa Melayu",
     "Chinese"
   ];
+  // Built-in calculator for simple arithmetic
+  // This makes basic maths accurate without relying on AI.
 
+  const mathMatch = message.match(
+    /(-?\d+(?:\.\d+)?)\s*([+\-−×x*/÷])\s*(-?\d+(?:\.\d+)?)/i
+  );
+
+  if (mathMatch) {
+    const a = Number(mathMatch[1]);
+    const operator = mathMatch[2];
+    const b = Number(mathMatch[3]);
+
+    let result;
+
+    switch (operator) {
+      case "+":
+        result = a + b;
+        break;
+      case "-":
+      case "−":
+        result = a - b;
+        break;
+      case "×":
+      case "x":
+        result = a * b;
+        break;
+      case "*":
+        result = a * b;
+        break;
+      case "/":
+      case "÷":
+        if (b === 0) {
+          const zeroMessage =
+            language === "中文"
+              ? "除数不能是零哦！😊"
+              : language === "Bahasa Melayu"
+                ? "Kita tak boleh membahagi dengan sifar! 😊"
+                : "We can't divide by zero! 😊";
+
+          return res.status(200).json({
+            reply: zeroMessage
+          });
+        }
+        result = a / b;
+        break;
+    }
+
+    if (Number.isFinite(result)) {
+      const formattedResult = Number.isInteger(result)
+        ? String(result)
+        : String(Number(result.toFixed(6)));
+
+      let reply;
+
+      if (language === "中文" || language === "Chinese") {
+        reply = `算出来啦！${a} ${operator} ${b} = ${formattedResult}！🎉`;
+      } else if (language === "Bahasa Melayu") {
+        reply = `Bagus! ${a} ${operator} ${b} = ${formattedResult}! 🎉`;
+      } else {
+        reply = `Great question! ${a} ${operator} ${b} = ${formattedResult}! 🎉`;
+      }
+
+      return res.status(200).json({ reply });
+    }
+  }
   const safeLanguage = allowedLanguages.includes(language)
     ? language
     : "English";
