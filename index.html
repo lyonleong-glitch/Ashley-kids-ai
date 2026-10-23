@@ -53,11 +53,105 @@ const replies={
 English:{hello:'Hello, little star! 🌟 Ready to learn through play? Choose an adventure and we’ll begin!',count:'Let’s count together! 🍎 How many apples are here? 🍎 🍎 🍎 Try counting them out loud!',animals:'Animal guessing game! 🐾 I have a long trunk and big ears. Which animal am I?',story:'Once upon a time, a tiny fox found a sparkling star in the forest… ✨ What do you think the fox did next?',puzzle:'Brain teaser! 🧩 What has four legs but cannot walk? Hint: it might be something you sit on!',math:'Mini maths challenge! 🚀 You have 2 toy cars and get 1 more. How many cars do you have now?',letters:'Word adventure! 📚 “Cat” starts with the /k/ sound. Can you think of another word that starts with the same sound?',fallback:'That’s a lovely thing to ask! 😊 Let’s explore together. Can you tell me a little more, or choose one of our adventures above?'},
 'Bahasa Melayu':{hello:'Hai, kawan kecil! 🌟 Jom belajar sambil bermain! Pengembaraan mana yang kamu pilih?',count:'Jom mengira! 🍎 Berapa biji epal ini? 🍎 🍎 🍎 Cuba kira dengan kuat!',animals:'Teka haiwan! 🐾 Saya mempunyai belalai panjang dan telinga besar. Haiwan apakah saya?',story:'Pada suatu hari, seekor musang kecil menemui bintang berkilau di dalam hutan… ✨ Apakah yang berlaku seterusnya?',puzzle:'Teka-teki! 🧩 Apakah yang mempunyai empat kaki tetapi tidak boleh berjalan? Petunjuk: kamu mungkin duduk di atasnya!',math:'Cabaran matematik! 🚀 Kamu ada 2 kereta mainan dan mendapat 1 lagi. Berapa semuanya?',letters:'Jom bermain perkataan! 📚 “Bola” bermula dengan bunyi /b/. Bolehkah kamu fikirkan perkataan lain yang bermula dengan bunyi itu?',fallback:'Soalan yang menarik! 😊 Jom kita teroka bersama. Boleh ceritakan sedikit lagi?'},
 '中文':{hello:'你好，小小探索家！🌟 准备好一起玩和学习了吗？',count:'我们一起数一数！🍎 这里有几个苹果？🍎 🍎 🍎 大声数一数吧！',animals:'猜猜是什么动物！🐾 我有长长的鼻子和大大的耳朵。我是谁？',story:'从前，一只小狐狸在森林里发现了一颗闪闪发光的星星……✨ 接下来会发生什么呢？',puzzle:'动动脑筋！🧩 什么东西有四条腿，却不会走路？提示：你可能会坐在它上面！',math:'数学小挑战！🚀 你有2辆玩具车，又得到1辆。现在一共有几辆？',letters:'文字小冒险！📚 你能找一个和“猫”发音开头相似的词吗？',fallback:'这个问题真有趣！😊 我们一起探索吧。你可以多告诉我一点吗？'}};
-function say(text,who='ashley'){const b=document.createElement('div');b.className='bubble '+(who==='kid'?'kid':'ashley');b.textContent=text;$('#chat').appendChild(b);$('#chat').scrollTop=$('#chat').scrollHeight}
+function speakReply(text) {
+  if (!('speechSynthesis' in window)) return;
+
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  const lang = $('#language').value;
+
+  utterance.lang =
+    lang === 'Bahasa Melayu' ? 'ms-MY' :
+    lang === '中文' ? 'zh-CN' : 'en-MY';
+
+  utterance.rate = 0.9;
+  window.speechSynthesis.speak(utterance);
+}
+
+function say(text, who = 'ashley') {
+  const b = document.createElement('div');
+  b.className = 'bubble ' + (who === 'kid' ? 'kid' : 'ashley');
+  b.textContent = text;
+  $('#chat').appendChild(b);
+  $('#chat').scrollTop = $('#chat').scrollHeight;
+
+  if (who === 'ashley') {
+    speakReply(text);
+  }
+}
 function activity(key){return (replies[$('#language').value]||replies.English)[key]||replies.English.fallback}
 function startAdventure(){const a=$('#activity').value;let key=a.includes('Counting')?'count':a.includes('Animals')?'animals':a.includes('Story')?'story':a.includes('Puzzle')?'puzzle':a.includes('maths')?'math':a.includes('words')?'letters':topic.includes('Counting')?'count':topic.includes('Animals')?'animals':topic.includes('Story')?'story':topic.includes('Puzzle')?'puzzle':'hello';say(activity(key))}
 document.querySelectorAll('.mode').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;document.querySelectorAll('.mode').forEach(x=>x.classList.toggle('selected',x===b));$('#mode-label').textContent=mode==='play'?'Play Mode':'Explorer Mode';say(mode==='play'?'Play Mode is ready! 🧸 Let’s explore colours, animals, counting and stories.':'Explorer Mode is ready! 🚀 Let’s try words, maths, science and brain challenges.')}));document.querySelectorAll('.topic').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x===b));topic=b.textContent.replace(/^\S+\s*/,'');$('#activity').value=topic.includes('Counting')?'Numbers & maths':topic.includes('Animals')?'Animals & nature':topic.includes('Story')?'Story time':topic.includes('Puzzle')?'Riddles & puzzles':'Surprise me!'}));$('#start').addEventListener('click',startAdventure);
+// Voice input: only starts when the child taps the microphone.
+const SpeechRecognition =
+  window.SpeechRecognition || window.webkitSpeechRecognition;
 
+const micButton = $('#mic-button');
+const voiceStatus = $('#voice-status');
+let recognition = null;
+let listening = false;
+
+if (!SpeechRecognition) {
+  micButton.disabled = true;
+  voiceStatus.textContent =
+    'Voice input is not supported in this browser. You can still type.';
+} else {
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  micButton.addEventListener('click', () => {
+    if (listening) {
+      recognition.stop();
+      return;
+    }
+
+    const lang = $('#language').value;
+    recognition.lang =
+      lang === 'Bahasa Melayu' ? 'ms-MY' :
+      lang === '中文' ? 'zh-CN' : 'en-MY';
+
+    try {
+      window.speechSynthesis?.cancel();
+      recognition.start();
+      listening = true;
+      micButton.textContent = '⏹️';
+      voiceStatus.textContent = 'Listening… Speak now!';
+    } catch (error) {
+      voiceStatus.textContent =
+        'Please try tapping the microphone again.';
+    }
+  });
+
+  recognition.onresult = event => {
+    const transcript =
+      event.results[0][0].transcript.trim();
+
+    if (transcript) {
+      $('#message').value = transcript;
+      voiceStatus.textContent = 'I heard: ' + transcript;
+      $('#chat-form').requestSubmit();
+    }
+  };
+
+  recognition.onerror = event => {
+    voiceStatus.textContent =
+      event.error === 'not-allowed'
+        ? 'Microphone permission was denied. Please ask a grown-up for help.'
+        : 'I could not hear that clearly. Please try again or type.';
+  };
+
+  recognition.onend = () => {
+    listening = false;
+    micButton.textContent = '🎤';
+
+    if (voiceStatus.textContent === 'Listening… Speak now!') {
+      voiceStatus.textContent = 'Tap the microphone to try again.';
+    }
+  };
+}
 $('#chat-form').addEventListener('submit', async e => {
   e.preventDefault();
 
