@@ -41,6 +41,50 @@ function say(text,who='ashley'){const b=document.createElement('div');b.classNam
 function activity(key){return (replies[$('#language').value]||replies.English)[key]||replies.English.fallback}
 function startAdventure(){const a=$('#activity').value;let key=a.includes('Counting')?'count':a.includes('Animals')?'animals':a.includes('Story')?'story':a.includes('Puzzle')?'puzzle':a.includes('maths')?'math':a.includes('words')?'letters':topic.includes('Counting')?'count':topic.includes('Animals')?'animals':topic.includes('Story')?'story':topic.includes('Puzzle')?'puzzle':'hello';say(activity(key))}
 document.querySelectorAll('.mode').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;document.querySelectorAll('.mode').forEach(x=>x.classList.toggle('selected',x===b));$('#mode-label').textContent=mode==='play'?'Play Mode':'Explorer Mode';say(mode==='play'?'Play Mode is ready! 🧸 Let’s explore colours, animals, counting and stories.':'Explorer Mode is ready! 🚀 Let’s try words, maths, science and brain challenges.')}));document.querySelectorAll('.topic').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x===b));topic=b.textContent.replace(/^\S+\s*/,'');$('#activity').value=topic.includes('Counting')?'Numbers & maths':topic.includes('Animals')?'Animals & nature':topic.includes('Story')?'Story time':topic.includes('Puzzle')?'Riddles & puzzles':'Surprise me!'}));$('#start').addEventListener('click',startAdventure);
-$('#chat-form').addEventListener('submit',e=>{e.preventDefault();const v=$('#message').value.trim();if(!v)return;say(v,'kid');$('#message').value='';const t=v.toLowerCase();let k='fallback';if(/hello|hi |hai|你好/.test(t))k='hello';else if(/count|number|how many|kira|berapa|数一数|几个/.test(t))k='count';else if(/animal|elephant|haiwan|gajah|动物|大象/.test(t))k='animals';else if(/story|cerita|故事/.test(t))k='story';else if(/puzzle|riddle|teka|谜语/.test(t))k='puzzle';else if(/math|plus|add|tambah|数学|加/.test(t))k='math';else if(/letter|word|phonics|huruf|perkataan|字|词/.test(t))k='letters';say(activity(k));});
+
+$('#chat-form').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const input = $('#message');
+  const message = input.value.trim();
+  if (!message) return;
+
+  say(message, 'kid');
+  input.value = '';
+  input.disabled = true;
+
+  const sendButton = $('#chat-form button');
+  sendButton.disabled = true;
+  sendButton.textContent = 'Thinking…';
+
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        age: mode === 'explore' ? 6 : 4,
+        language: $('#language').value
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Please try again.');
+    }
+
+    say(data.reply || 'Let’s try another question! 😊');
+  } catch (error) {
+    say('Oops! I couldn’t connect just now. Please ask a grown-up to help me check my connection. 💛');
+    console.error('Ashley chat error:', error);
+  } finally {
+    input.disabled = false;
+    sendButton.disabled = false;
+    sendButton.textContent = 'Send';
+    input.focus();
+  }
+});
+
 $('#language').addEventListener('change',()=>say(activity('hello')));
 </script></body></html>
