@@ -2,12 +2,13 @@ export default async function handler(req, res) {
   // Only allow POST requests
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
+
     return res.status(405).json({
       error: "Method not allowed"
     });
   }
 
-  // Get the private API key from Vercel
+  // Get the private Gemini API key from Vercel
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -16,26 +17,27 @@ export default async function handler(req, res) {
     });
   }
 
-  // Get the child's message
+  // Get information from the website
   const { message, age, language } = req.body || {};
 
+  // Check message
   if (typeof message !== "string" || !message.trim()) {
     return res.status(400).json({
       error: "Please enter a message."
     });
   }
 
-  // Keep messages reasonably short
+  // Limit message size
   if (message.length > 500) {
     return res.status(400).json({
       error: "Please keep the message under 500 characters."
     });
   }
 
-  // Ashley supports two child modes
+  // Ashley has two child modes
   const childAge = Number(age) === 6 ? 6 : 4;
 
-  // Supported languages
+  // Ashley supports Malaysia's three main languages
   const allowedLanguages = [
     "English",
     "Bahasa Melayu",
@@ -46,9 +48,73 @@ export default async function handler(req, res) {
     ? language
     : "English";
 
-  try {
-    // Send the child's question to Gemini
-    const response = await fetch(
+  // Ashley's personality and safety instructions
+  const systemPrompt = `
+You are Ashley, a warm, playful and safe AI learning companion for children in Malaysia.
+
+The child is ${childAge} years old.
+
+Reply in ${safeLanguage}.
+
+PERSONALITY:
+- Warm
+- Playful
+- Patient
+- Curious
+- Encouraging
+- Friendly
+- Never strict or scary
+
+Ashley should feel like a friendly learning buddy rather than a teacher.
+
+LEARNING STYLE:
+- Use simple language suitable for the child's age.
+- Keep answers short and easy to understand.
+- Ask gentle questions when appropriate.
+- Encourage the child to think instead of simply giving every answer.
+- Use examples, stories, games and imagination.
+- Celebrate effort, not only correct answers.
+- Never shame the child for mistakes.
+
+FOR THE 4-YEAR-OLD:
+- Use very simple words.
+- Use playful examples.
+- Keep explanations especially short.
+- Focus on curiosity, basic numbers, colours, shapes, animals, stories and everyday learning.
+
+FOR THE 6-YEAR-OLD:
+- Encourage curiosity and simple reasoning.
+- Help prepare the child for primary school.
+- Support reading, spelling, basic mathematics, science and general knowledge.
+- When appropriate, give small challenges or puzzles.
+
+LANGUAGES:
+- English
+- Bahasa Melayu
+- Chinese
+
+SAFETY:
+- Never ask for the child's full name.
+- Never ask for an address.
+- Never ask for school name.
+- Never ask for phone numbers.
+- Never ask for passwords.
+- Never ask for private photos.
+- Never encourage a child to keep secrets from parents or caregivers.
+- If a child shares personal information, gently remind them not to share private information online and to tell a trusted grown-up.
+- Do not provide dangerous instructions.
+- For medical, emergency, sexual or serious personal issues, tell the child to speak to a trusted grown-up.
+- Never pretend to be a human.
+- Never say Ashley can replace parents, family or real friends.
+
+Keep normal answers under about 100 words.
+
+Be kind, positive, encouraging and fun.
+  `.trim();
+
+  // Gemini request function
+  async function askGemini() {
+    return await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
       {
         method: "POST",
@@ -62,66 +128,7 @@ export default async function handler(req, res) {
           systemInstruction: {
             parts: [
               {
-                text: `
-You are Ashley, a warm, playful and safe AI learning companion for children in Malaysia.
-
-The child is ${childAge} years old.
-
-Reply in ${safeLanguage}.
-
-Your personality:
-- Warm
-- Playful
-- Patient
-- Curious
-- Encouraging
-- Friendly
-- Never strict or scary
-
-Ashley should feel like a friendly learning buddy rather than a teacher.
-
-Learning style:
-- Use very simple language suitable for the child's age.
-- Keep answers short and easy to understand.
-- Ask gentle questions when appropriate.
-- Encourage the child to think instead of simply giving every answer.
-- Use examples, stories, games and imagination.
-- Celebrate effort, not just correct answers.
-- Never shame the child for making mistakes.
-
-For the 4-year-old:
-- Use very simple words.
-- Use playful examples.
-- Keep explanations especially short.
-
-For the 6-year-old:
-- Encourage curiosity and simple reasoning.
-- Help prepare the child for primary school.
-- Support reading, basic mathematics, science and general knowledge.
-
-Languages:
-- English
-- Bahasa Melayu
-- Chinese
-
-Safety:
-- Never ask for the child's full name.
-- Never ask for an address.
-- Never ask for school name.
-- Never ask for phone numbers.
-- Never ask for passwords.
-- Never ask for private photos.
-- Never encourage a child to keep secrets from parents or caregivers.
-- If the child shares personal information, gently remind them not to share private information online and to tell a trusted grown-up.
-- For dangerous activities, do not provide instructions that could cause harm.
-- For medical, emergency, sexual or serious personal issues, tell the child to speak to a trusted grown-up.
-- Never pretend to be a human.
-- Never say that Ashley can replace parents, family or real friends.
-
-Keep normal replies under about 100 words.
-
-Be kind, positive and fun.
-                `.trim()
+                text: systemPrompt
               }
             ]
           },
@@ -143,56 +150,129 @@ Be kind, positive and fun.
         })
       }
     );
+  }
 
-    // Read Google's response
-    const data = await response.json();
+  try {
+    /*
+      Gemini can temporarily return 503 when the model
+      is experiencing high demand.
 
-    // Gemini returned an error
-    if (!response.ok) {
+      We retry with increasing delays:
+
+      Attempt 1 → immediately
+      Attempt 2 → wait 1 second
+      Attempt 3 → wait 2 seconds
+      Attempt 4 → wait 4 seconds
+    */
+
+    const maxAttempts = 4;
+
+    let response;
+    let data;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+
+      if (attempt > 1) {
+        const delay = Math.pow(2, attempt - 2) * 1000;
+
+        await new Promise(resolve =>
+          setTimeout(resolve, delay)
+        );
+      }
+
+      response = await askGemini();
+
+      data = await response.json();
+
+      // Success
+      if (response.ok) {
+        break;
+      }
+
       console.error(
-        "Gemini request failed:",
+        `Gemini attempt ${attempt} failed:`,
         response.status,
         JSON.stringify(data)
       );
 
+      // Only retry temporary server/capacity errors
+      if (
+        response.status !== 503 &&
+        response.status !== 429
+      ) {
+        break;
+      }
+    }
+
+    // Gemini still failed after retries
+    if (!response || !response.ok) {
+
+      const status = response?.status || 500;
+
+      console.error(
+        "Gemini final error:",
+        status,
+        JSON.stringify(data)
+      );
+
+      if (status === 503) {
+        return res.status(503).json({
+          error:
+            "Ashley is temporarily busy. Please try again in a little while. 💛"
+        });
+      }
+
+      if (status === 429) {
+        return res.status(429).json({
+          error:
+            "Ashley has reached the current free usage limit. Please try again later. 💛"
+        });
+      }
+
       return res.status(502).json({
-        error: "Gemini request failed.",
-        status: response.status,
-        details: data.error?.message || "Unknown Gemini error."
+        error:
+          "Ashley could not get an answer from the AI service."
       });
     }
 
     // Extract Ashley's answer
     const reply = data.candidates
-      ?.flatMap(candidate => candidate.content?.parts || [])
+      ?.flatMap(candidate =>
+        candidate.content?.parts || []
+      )
       ?.map(part => part.text || "")
       ?.join("")
       ?.trim();
 
+    // No answer returned
     if (!reply) {
+
       console.error(
         "Gemini returned no text:",
         JSON.stringify(data)
       );
 
       return res.status(502).json({
-        error: "Ashley didn't receive an answer. Please try again."
+        error:
+          "Ashley didn't receive an answer. Please try again."
       });
     }
 
-    // Send Ashley's answer back to the website
+    // Everything worked!
     return res.status(200).json({
       reply
     });
 
   } catch (error) {
+
     console.error(
       "Ashley API connection error:",
       error.message
     );
 
     return res.status(500).json({
-      error: "Ashley could not connect to the AI service."
+      error:
+        "Ashley could not connect to the AI service."
     });
   }
 }
